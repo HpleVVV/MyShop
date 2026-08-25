@@ -2,6 +2,8 @@
 
 Hệ thống quản lý cửa hàng tạp hóa, gồm dashboard, sản phẩm, tồn kho và bán hàng.
 
+Truy cập domain sau để xem demo: http://103.116.52.252:14163/
+
 ## Chạy local bằng Docker
 
 ```powershell
