@@ -1,0 +1,237 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  CASHIER
+}
+
+enum ProductUnit {
+  PIECE
+  PACK
+  BOTTLE
+  BOX
+}
+
+enum SaleStatus {
+  COMPLETED
+  CANCELLED
+  PARTIALLY_RETURNED
+  RETURNED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  MOBILE
+}
+
+enum StockMovementType {
+  PURCHASE
+  SALE
+  RETURN
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+}
+
+model Store {
+  id                  String           @id @default(uuid()) @db.Uuid
+  name                String           @db.VarChar(120)
+  currencyCode        String           @default("VND") @db.Char(3)
+  taxRateBasisPoints  Int              @default(0)
+  users               User[]
+  products            Product[]
+  categories          Category[]
+  suppliers           Supplier[]
+  customers           Customer[]
+  sales               Sale[]
+  returns             Return[]
+  stockMovements      StockMovement[]
+  auditLogs           AuditLog[]
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+}
+
+model User {
+  id             String          @id @default(uuid()) @db.Uuid
+  storeId        String          @db.Uuid
+  name           String          @db.VarChar(120)
+  email          String          @db.VarChar(255)
+  passwordHash   String
+  role           Role            @default(CASHIER)
+  isActive       Boolean         @default(true)
+  store          Store           @relation(fields: [storeId], references: [id])
+  sales          Sale[]
+  stockMovements StockMovement[]
+  auditLogs      AuditLog[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  @@unique([storeId, email])
+  @@index([storeId, role])
+}
+
+model Category {
+  id       String    @id @default(uuid()) @db.Uuid
+  storeId  String    @db.Uuid
+  name     String    @db.VarChar(100)
+  store    Store     @relation(fields: [storeId], references: [id])
+  products Product[]
+  @@unique([storeId, name])
+}
+
+model Supplier {
+  id       String    @id @default(uuid()) @db.Uuid
+  storeId  String    @db.Uuid
+  name     String    @db.VarChar(160)
+  phone    String?   @db.VarChar(30)
+  isActive Boolean   @default(true)
+  store    Store     @relation(fields: [storeId], references: [id])
+  products Product[]
+  @@index([storeId, name])
+}
+
+model Product {
+  id                String          @id @default(uuid()) @db.Uuid
+  storeId           String          @db.Uuid
+  categoryId        String?         @db.Uuid
+  supplierId        String?         @db.Uuid
+  name              String          @db.VarChar(180)
+  barcode           String?         @db.VarChar(80)
+  unit              ProductUnit     @default(PIECE)
+  costPriceMinor    BigInt
+  sellingPriceMinor BigInt
+  currentQuantity   Int             @default(0)
+  minimumQuantity   Int             @default(0)
+  expiryDate        DateTime?       @db.Date
+  isActive          Boolean         @default(true)
+  store             Store           @relation(fields: [storeId], references: [id])
+  category          Category?       @relation(fields: [categoryId], references: [id])
+  supplier          Supplier?       @relation(fields: [supplierId], references: [id])
+  saleItems         SaleItem[]
+  stockMovements    StockMovement[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  @@unique([storeId, barcode])
+  @@index([storeId, name])
+  @@index([storeId, currentQuantity])
+}
+
+model Customer {
+  id        String   @id @default(uuid()) @db.Uuid
+  storeId   String   @db.Uuid
+  name      String   @db.VarChar(160)
+  phone     String?  @db.VarChar(30)
+  store     Store    @relation(fields: [storeId], references: [id])
+  sales     Sale[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([storeId, name])
+  @@index([storeId, phone])
+}
+
+model Sale {
+  id            String        @id @default(uuid()) @db.Uuid
+  storeId       String        @db.Uuid
+  receiptNumber String        @db.VarChar(40)
+  customerId    String?       @db.Uuid
+  createdById   String        @db.Uuid
+  status        SaleStatus    @default(COMPLETED)
+  paymentMethod PaymentMethod
+  subtotalMinor BigInt
+  discountMinor BigInt        @default(0)
+  taxMinor      BigInt        @default(0)
+  totalMinor    BigInt
+  completedAt   DateTime?
+  store         Store         @relation(fields: [storeId], references: [id])
+  customer      Customer?     @relation(fields: [customerId], references: [id])
+  createdBy     User          @relation(fields: [createdById], references: [id])
+  items         SaleItem[]
+  returns       Return[]
+  stockMovements StockMovement[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  @@unique([storeId, receiptNumber])
+  @@index([storeId, completedAt])
+  @@index([storeId, status])
+}
+
+model SaleItem {
+  id                  String       @id @default(uuid()) @db.Uuid
+  saleId              String       @db.Uuid
+  productId           String       @db.Uuid
+  productNameSnapshot String       @db.VarChar(180)
+  unitSnapshot        String       @db.VarChar(20)
+  costPriceMinor      BigInt
+  sellingPriceMinor   BigInt
+  quantity            Int
+  discountMinor       BigInt       @default(0)
+  lineTotalMinor      BigInt
+  sale                Sale         @relation(fields: [saleId], references: [id])
+  product             Product      @relation(fields: [productId], references: [id])
+  returnItems         ReturnItem[]
+  @@index([productId, saleId])
+}
+
+model StockMovement {
+  id              String             @id @default(uuid()) @db.Uuid
+  storeId         String             @db.Uuid
+  productId       String             @db.Uuid
+  performedById   String             @db.Uuid
+  saleId          String?            @db.Uuid
+  type            StockMovementType
+  quantityDelta   Int
+  quantityBefore  Int
+  quantityAfter   Int
+  reason          String?            @db.VarChar(255)
+  store           Store              @relation(fields: [storeId], references: [id])
+  product         Product            @relation(fields: [productId], references: [id])
+  performedBy     User               @relation(fields: [performedById], references: [id])
+  sale            Sale?              @relation(fields: [saleId], references: [id])
+  createdAt       DateTime           @default(now())
+  @@index([storeId, createdAt])
+  @@index([productId, createdAt])
+}
+
+model Return {
+  id            String       @id @default(uuid()) @db.Uuid
+  storeId       String       @db.Uuid
+  saleId        String       @db.Uuid
+  processedById  String       @db.Uuid
+  reason        String       @db.VarChar(255)
+  totalMinor    BigInt
+  store         Store        @relation(fields: [storeId], references: [id])
+  sale          Sale         @relation(fields: [saleId], references: [id])
+  items         ReturnItem[]
+  createdAt     DateTime     @default(now())
+}
+
+model ReturnItem {
+  id         String   @id @default(uuid()) @db.Uuid
+  returnId   String   @db.Uuid
+  saleItemId String   @db.Uuid
+  quantity   Int
+  lineTotalMinor BigInt
+  return     Return   @relation(fields: [returnId], references: [id])
+  saleItem   SaleItem @relation(fields: [saleItemId], references: [id])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  storeId    String   @db.Uuid
+  userId     String   @db.Uuid
+  action     String   @db.VarChar(80)
+  entityType String   @db.VarChar(80)
+  entityId   String   @db.Uuid
+  metadata   Json
+  store      Store    @relation(fields: [storeId], references: [id])
+  user       User     @relation(fields: [userId], references: [id])
+  createdAt  DateTime @default(now())
+  @@index([storeId, createdAt])
+  @@index([entityType, entityId])
+}
