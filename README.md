@@ -2,17 +2,39 @@
 
 Hệ thống quản lý cửa hàng tạp hóa, gồm dashboard, sản phẩm, tồn kho và bán hàng.
 
-## Chạy PostgreSQL local
+## Chạy local bằng Docker
 
 ```powershell
 docker compose up -d
 Copy-Item .env.example .env
 npm run db:migrate -- --name init
 npm run db:seed
-npm run dev
 ```
 
-Mở `http://localhost:3000`.
+Ứng dụng web được publish tại `http://localhost` (cổng `80`). PostgreSQL chỉ mở trên `127.0.0.1:5432`.
+
+## Deploy trên VPS
+
+```bash
+git clone https://github.com/HpleVVV/MyShop.git
+cd MyShop
+cp .env.example .env
+nano .env
+docker compose up -d --build
+docker compose exec app npx prisma migrate deploy
+docker compose exec app npm run db:seed
+```
+
+Trong file `.env` trên VPS, đặt `AUTH_SECRET` bằng secret ngẫu nhiên dài. Port `80` của VPS phải được mở trong firewall và không bị Nginx/Apache hoặc service khác sử dụng.
+
+Kiểm tra:
+
+```bash
+docker compose ps
+curl -I http://localhost
+```
+
+Nếu cần dùng reverse proxy hiện có, đổi mapping trong `docker-compose.yml` từ `80:80` sang `127.0.0.1:3000:80` và proxy từ web server vào `127.0.0.1:3000`.
 
 ## API development headers
 

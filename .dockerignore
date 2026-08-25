@@ -1,0 +1,8 @@
+node_modules
+.next
+.git
+.env
+planning-artifacts
+README.md
+Dockerfile
+.dockerignore
